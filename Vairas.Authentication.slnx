@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="Vairas.Authentication/Vairas.Authentication.csproj" />
+  <Project Path="Vairas.Authentication.Business/Vairas.Authentication.Business.csproj" />
+  <Project Path="Vairas.Authentication.Domain/Vairas.Authentication.Domain.csproj" />
+  <Project Path="Vairas.Authentication.Persistance/Vairas.Authentication.Persistance.csproj" />
+  <Project Path="Vairas.Authentication.Tests/Vairas.Authentication.Tests.csproj" />
+</Solution>

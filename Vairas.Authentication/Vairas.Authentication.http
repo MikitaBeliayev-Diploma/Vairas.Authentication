@@ -1,0 +1,103 @@
+@baseUrl = https://localhost:7100
+@email = synthetic-student@example.test
+@password = {{$processEnv VAIRAS_DEMO_PASSWORD}}
+@userToken = {{$processEnv VAIRAS_USER_TOKEN}}
+@refreshToken = {{$processEnv VAIRAS_REFRESH_TOKEN}}
+@challengeToken = {{$processEnv VAIRAS_CHALLENGE_TOKEN}}
+@clientSecret = {{$processEnv VAIRAS_WORKLOAD_SECRET}}
+@workloadToken = {{$processEnv VAIRAS_WORKLOAD_TOKEN}}
+@identityId = {{$processEnv VAIRAS_IDENTITY_ID}}
+@sessionId = {{$processEnv VAIRAS_SESSION_ID}}
+@operationId = {{$processEnv VAIRAS_OPERATION_ID}}
+
+### Register; returns 202 without exposing identity or email token
+POST {{baseUrl}}/api/v1/auth/registrations
+Content-Type: application/json
+
+{"email":"{{email}}","password":"{{password}}"}
+
+### Request VerifyEmail or ResetPassword
+POST {{baseUrl}}/api/v1/auth/challenges
+Content-Type: application/json
+
+{"email":"{{email}}","purpose":"VerifyEmail"}
+
+### Complete verification using the token obtained from the actual SMTP email
+POST {{baseUrl}}/api/v1/auth/challenges/completion
+Content-Type: application/json
+
+{"challengeToken":"{{challengeToken}}"}
+
+### For ResetPassword add newPassword; this revokes all current sessions
+POST {{baseUrl}}/api/v1/auth/challenges/completion
+Content-Type: application/json
+
+{"challengeToken":"{{challengeToken}}","newPassword":"{{password}}"}
+
+### Password login requires completed email verification
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{"email":"{{email}}","password":"{{password}}"}
+
+### Rotate once; reuse of this token revokes its whole session family
+POST {{baseUrl}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{"refreshToken":"{{refreshToken}}"}
+
+### Reuse the same operation ID for an exact retry
+POST {{baseUrl}}/api/v1/auth/sessions/{{sessionId}}/revocation
+Authorization: Bearer {{userToken}}
+Idempotency-Key: {{operationId}}
+
+### OAuth client credentials, never an end-user password grant
+POST {{baseUrl}}/connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&client_id=user-management&client_secret={{clientSecret}}&scope=identity.validate%20school.profile-provisioning%20confirmations.validate
+
+### Service-to-service admission with separate workload audience and scope
+POST {{baseUrl}}/internal/v1/sessions/validate
+Authorization: Bearer {{workloadToken}}
+Content-Type: application/json
+
+{"identityId":"{{identityId}}","sessionId":"{{sessionId}}"}
+
+### Start an allowlisted OIDC login; retain its HttpOnly cookie
+POST {{baseUrl}}/api/v1/auth/oidc/requests
+Content-Type: application/json
+
+{"issuer":"https://YOUR_CONFIGURED_ISSUER","redirectUri":"https://YOUR_FRONTEND/oidc/callback","purpose":"Login"}
+
+### Explicit linking additionally requires the existing active user session
+POST {{baseUrl}}/api/v1/auth/oidc/requests
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{"issuer":"https://YOUR_CONFIGURED_ISSUER","redirectUri":"https://YOUR_FRONTEND/oidc/callback","purpose":"Link"}
+
+### Browser frontend forwards code/state and the server-set cookie after provider redirect
+POST {{baseUrl}}/api/v1/auth/oidc/callback
+Content-Type: application/json
+
+{"code":"{{$processEnv VAIRAS_OIDC_CODE}}","state":"{{$processEnv VAIRAS_OIDC_STATE}}"}
+
+### Public issuer metadata
+GET {{baseUrl}}/.well-known/openid-configuration
+
+### Public signing material only
+GET {{baseUrl}}/.well-known/jwks.json
+
+### Process and owned-resource probes
+GET {{baseUrl}}/health/live
+
+### Database, signing keys and protection availability
+GET {{baseUrl}}/health/ready
+
+### Negative example: empty identity binding must return 400
+POST {{baseUrl}}/internal/v1/sessions/validate
+Authorization: Bearer {{workloadToken}}
+Content-Type: application/json
+
+{"identityId":"00000000-0000-0000-0000-000000000000","sessionId":"00000000-0000-0000-0000-000000000000"}
